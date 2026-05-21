@@ -12,13 +12,16 @@
 
 ## Table of Contents
 
-- [Why this exists](#why-this-exists)
-- [How to build](#how-to-build)
-- [Directory structure](#directory-structure)
-- [Make vs CMake — concept map](#make-vs-cmake--concept-map)
-- [When to prefer CMake over Make](#when-to-prefer-cmake-over-make)
-- [When Make is still the right tool](#when-make-is-still-the-right-tool)
-- [How CMake works under the hood](#how-cmake-works-under-the-hood)
+- [Lab 2 Extra — CMake Build System Reference](#lab-2-extra--cmake-build-system-reference)
+  - [Table of Contents](#table-of-contents)
+  - [Why this exists](#why-this-exists)
+  - [How to build](#how-to-build)
+  - [Directory structure](#directory-structure)
+  - [Make vs CMake — concept map](#make-vs-cmake--concept-map)
+    - [The one concept with no Make equivalent: the toolchain file](#the-one-concept-with-no-make-equivalent-the-toolchain-file)
+  - [When to prefer CMake over Make](#when-to-prefer-cmake-over-make)
+  - [When Make is still the right tool](#when-make-is-still-the-right-tool)
+  - [How CMake works under the hood](#how-cmake-works-under-the-hood)
 
 ---
 
@@ -48,9 +51,9 @@ bash scripts/copy_lab1.sh <path-to-your-lab1-repo>
 #     Linux / WSL (default generator = Unix Makefiles):
 cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
 #
-#     Windows Git Bash — specify the generator explicitly to match your make:
-#       MinGW (GnuWin32):  cmake -B build -G "MinGW Makefiles" -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
-#       Ninja:             cmake -B build -G "Ninja"            -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
+#     Windows Git Bash — specify the generator and make program explicitly:
+#       GnuWin32 Make:  cmake -B build -G "MinGW Makefiles" -DCMAKE_MAKE_PROGRAM=make -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
+#       Ninja:          cmake -B build -G "Ninja" -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
 
 # 2 — Build: compile and link (equivalent to: make all)
 cmake --build build
@@ -118,28 +121,28 @@ Only the build system files (`CMakeLists.txt`, `cmake/`) are new.
 Read `CMakeLists.txt` and `cmake/arm-none-eabi.cmake` side-by-side with the
 Lab 2.1 `Makefile`. Every concept has a direct equivalent.
 
-| Makefile concept                         | CMake equivalent                                      |
-| ---------------------------------------- | ----------------------------------------------------- |
-| `CC = arm-none-eabi-gcc`                 | `set(CMAKE_C_COMPILER arm-none-eabi-gcc)` in toolchain file |
-| `OBJCOPY = arm-none-eabi-objcopy`        | `find_program(CMAKE_OBJCOPY arm-none-eabi-objcopy)` in toolchain file |
-| `CPU_FLAGS = -mcpu=cortex-m4 ...`        | `CMAKE_C_FLAGS_INIT` / `CMAKE_EXE_LINKER_FLAGS_INIT` in toolchain file |
-| `EXTRA_CFLAGS ?=`                        | `set(EXTRA_CFLAGS "" CACHE STRING "...")` in CMakeLists.txt |
-| `TARGET = lab2`                          | `add_executable(lab2 ...)` |
-| `SRCS = src/main.c src/gpio.c`           | source list inside `add_executable(lab2 ...)` |
-| `ASM_SRC = startup/startup_stm32f412zg.s`| same source list — CMake detects `.s` files automatically |
-| `OBJS = $(SRCS:$(SRCDIR)/%.c=...)`       | not needed — CMake manages object files internally |
-| `-I$(INCDIR)`                            | `target_include_directories(lab2 PRIVATE inc)` |
-| `CFLAGS = -O0 -g3 -ffreestanding ...`    | `target_compile_options(lab2 PRIVATE -O0 -g3 ...)` |
-| `LDFLAGS = -nostdlib -T linker/...`      | `target_link_options(lab2 PRIVATE -nostdlib -T ...)` |
-| `-MMD -MP` + `-include $(wildcard *.d)`  | built-in — CMake tracks header dependencies automatically |
-| `$(ELF): $(OBJS) $(ASM_OBJ)` link rule  | implicit — `add_executable` generates the link step |
-| `$(OBJCOPY) -O binary ...` (P1.8)        | `add_custom_command(TARGET lab2 POST_BUILD ...)` |
-| `clean:` + `.PHONY`                      | `cmake --build build --target clean` (built-in) |
-| `size:` + `.PHONY`                       | `add_custom_target(size ...)` |
-| `flash:` + `.PHONY`                      | `add_custom_target(flash ...)` |
-| `$(BUILDDIR):` (output directory)        | not needed — CMake creates `build/` automatically |
-| ELF file extension (implicit)            | `set_target_properties(lab2 PROPERTIES SUFFIX ".elf")` — required because CMake's bare-metal `Generic` system adds no extension by default |
-| `make all EXTRA_CFLAGS="-DDEBUG"`        | `cmake -B build -DEXTRA_CFLAGS="-DDEBUG"` at configure time |
+| Makefile concept                          | CMake equivalent                                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CC = arm-none-eabi-gcc`                  | `set(CMAKE_C_COMPILER arm-none-eabi-gcc)` in toolchain file                                                                                |
+| `OBJCOPY = arm-none-eabi-objcopy`         | `find_program(CMAKE_OBJCOPY arm-none-eabi-objcopy)` in toolchain file                                                                      |
+| `CPU_FLAGS = -mcpu=cortex-m4 ...`         | `CMAKE_C_FLAGS_INIT` / `CMAKE_EXE_LINKER_FLAGS_INIT` in toolchain file                                                                     |
+| `EXTRA_CFLAGS ?=`                         | `set(EXTRA_CFLAGS "" CACHE STRING "...")` in CMakeLists.txt                                                                                |
+| `TARGET = lab2`                           | `add_executable(lab2 ...)`                                                                                                                 |
+| `SRCS = src/main.c src/gpio.c`            | source list inside `add_executable(lab2 ...)`                                                                                              |
+| `ASM_SRC = startup/startup_stm32f412zg.s` | same source list — CMake detects `.s` files automatically                                                                                  |
+| `OBJS = $(SRCS:$(SRCDIR)/%.c=...)`        | not needed — CMake manages object files internally                                                                                         |
+| `-I$(INCDIR)`                             | `target_include_directories(lab2 PRIVATE inc)`                                                                                             |
+| `CFLAGS = -O0 -g3 -ffreestanding ...`     | `target_compile_options(lab2 PRIVATE -O0 -g3 ...)`                                                                                         |
+| `LDFLAGS = -nostdlib -T linker/...`       | `target_link_options(lab2 PRIVATE -nostdlib -T ...)`                                                                                       |
+| `-MMD -MP` + `-include $(wildcard *.d)`   | built-in — CMake tracks header dependencies automatically                                                                                  |
+| `$(ELF): $(OBJS) $(ASM_OBJ)` link rule    | implicit — `add_executable` generates the link step                                                                                        |
+| `$(OBJCOPY) -O binary ...` (P1.8)         | `add_custom_command(TARGET lab2 POST_BUILD ...)`                                                                                           |
+| `clean:` + `.PHONY`                       | `cmake --build build --target clean` (built-in)                                                                                            |
+| `size:` + `.PHONY`                        | `add_custom_target(size ...)`                                                                                                              |
+| `flash:` + `.PHONY`                       | `add_custom_target(flash ...)`                                                                                                             |
+| `$(BUILDDIR):` (output directory)         | not needed — CMake creates `build/` automatically                                                                                          |
+| ELF file extension (implicit)             | `set_target_properties(lab2 PROPERTIES SUFFIX ".elf")` — required because CMake's bare-metal `Generic` system adds no extension by default |
+| `make all EXTRA_CFLAGS="-DDEBUG"`         | `cmake -B build -DEXTRA_CFLAGS="-DDEBUG"` at configure time                                                                                |
 
 ### The one concept with no Make equivalent: the toolchain file
 
@@ -154,15 +157,15 @@ Makefile directly.
 
 ## When to prefer CMake over Make
 
-| Scenario | Why CMake helps |
-| -------- | --------------- |
-| **Multiple target platforms** | One `CMakeLists.txt`, multiple toolchain files (x86 for unit tests, ARM for firmware) |
-| **Large projects with many subdirectories** | `add_subdirectory()` composes cleanly; Make subdirectory recursion is error-prone |
-| **IDE integration** | VS Code, CLion, STM32CubeIDE all read `CMakeLists.txt` natively; Make requires manual configuration |
-| **Dependency management** | `FetchContent` / `find_package` fetch and link libraries; Make has no equivalent |
-| **Out-of-source builds** | `cmake -B build` puts all generated files in `build/`; with Make you manage this manually |
-| **Cross-platform CI** | CMake generates Ninja on Linux and MSBuild on Windows from the same source |
-| **Industry standard** | Zephyr RTOS, ESP-IDF, STM32Cube ecosystem, LLVM, Qt — all use CMake |
+| Scenario                                    | Why CMake helps                                                                                     |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **Multiple target platforms**               | One `CMakeLists.txt`, multiple toolchain files (x86 for unit tests, ARM for firmware)               |
+| **Large projects with many subdirectories** | `add_subdirectory()` composes cleanly; Make subdirectory recursion is error-prone                   |
+| **IDE integration**                         | VS Code, CLion, STM32CubeIDE all read `CMakeLists.txt` natively; Make requires manual configuration |
+| **Dependency management**                   | `FetchContent` / `find_package` fetch and link libraries; Make has no equivalent                    |
+| **Out-of-source builds**                    | `cmake -B build` puts all generated files in `build/`; with Make you manage this manually           |
+| **Cross-platform CI**                       | CMake generates Ninja on Linux and MSBuild on Windows from the same source                          |
+| **Industry standard**                       | Zephyr RTOS, ESP-IDF, STM32Cube ecosystem, LLVM, Qt — all use CMake                                 |
 
 ---
 
